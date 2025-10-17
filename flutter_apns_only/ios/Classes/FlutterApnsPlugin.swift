@@ -27,6 +27,11 @@ func getFlutterError(_ error: Error) -> FlutterError {
         case "requestNotificationPermissions":
             requestNotificationPermissions(call, result: result)
         case "configure":
+            NSLog("[FlutterApns] configure called")
+            let currentDelegate = UNUserNotificationCenter.current().delegate
+            NSLog("[FlutterApns] Current delegate: \(String(describing: currentDelegate))")
+            NSLog("[FlutterApns] Plugin instance: \(self)")
+            
             assert(
                 UNUserNotificationCenter.current().delegate != nil,
                 "UNUserNotificationCenter.current().delegate is not set. Check readme at https://pub.dev/packages/flutter_apns."
@@ -35,7 +40,10 @@ func getFlutterError(_ error: Error) -> FlutterError {
 
             // check for onLaunch notification *after* configure has been ran
             if let launchNotification = launchNotification {
-                channel.invokeMethod("onLaunch", arguments: launchNotification)
+                NSLog("[FlutterApns] Sending cached launch notification")
+                DispatchQueue.main.async {
+                    self.channel.invokeMethod("onLaunch", arguments: launchNotification)
+                }
                 self.launchNotification = nil
                 return
             }
@@ -152,7 +160,9 @@ func getFlutterError(_ error: Error) -> FlutterError {
                     "provisional": granted && provisionalRequested
                 ]
                 
-                self.channel.invokeMethod("onIosSettingsRegistered", arguments: map)
+                DispatchQueue.main.async {
+                    self.channel.invokeMethod("onIosSettingsRegistered", arguments: map)
+                }
             }
             
             result(granted)
@@ -164,7 +174,9 @@ func getFlutterError(_ error: Error) -> FlutterError {
     //MARK:  - AppDelegate
     
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [AnyHashable : Any] = [:]) -> Bool {
+        NSLog("[FlutterApns] didFinishLaunchingWithOptions called")
         if let launchNotification = launchOptions[UIApplication.LaunchOptionsKey.remoteNotification] as? [String: Any] {
+            NSLog("[FlutterApns] Found launch notification: \(launchNotification)")
             self.launchNotification = FlutterApnsSerialization.remoteMessageUserInfo(toDict: launchNotification)
         }
         return true
@@ -180,17 +192,28 @@ func getFlutterError(_ error: Error) -> FlutterError {
     }
     
     public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        channel.invokeMethod("onToken", arguments: deviceToken.hexString)
+        NSLog("[FlutterApns] didRegisterForRemoteNotificationsWithDeviceToken: \(deviceToken.hexString)")
+        DispatchQueue.main.async {
+            self.channel.invokeMethod("onToken", arguments: deviceToken.hexString)
+        }
     }
     
     
     public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) -> Bool {
+        NSLog("[FlutterApns] didReceiveRemoteNotification called")
+        NSLog("[FlutterApns] userInfo: \(userInfo)")
+        NSLog("[FlutterApns] resumingFromBackground: \(resumingFromBackground)")
+        
         let userInfo = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
         
         if resumingFromBackground {
+            NSLog("[FlutterApns] Calling onResume")
             onResume(userInfo: userInfo)
         } else {
-            channel.invokeMethod("onMessage", arguments: userInfo)
+            NSLog("[FlutterApns] Calling onMessage")
+            DispatchQueue.main.async {
+                self.channel.invokeMethod("onMessage", arguments: userInfo)
+            }
         }
         
         completionHandler(.noData)
@@ -198,29 +221,43 @@ func getFlutterError(_ error: Error) -> FlutterError {
     }
     
     public func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        NSLog("[FlutterApns] userNotificationCenter willPresent called")
         let userInfo = notification.request.content.userInfo
+        NSLog("[FlutterApns] notification userInfo: \(userInfo)")
         
         guard userInfo["aps"] != nil else {
+            NSLog("[FlutterApns] No 'aps' key found, ignoring notification")
             return
         }
         
         let dict = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
         
-        channel.invokeMethod("willPresent", arguments: dict) { (result) in
-            let shouldShow = (result as? Bool) ?? false
-            if shouldShow {
-                completionHandler([.alert, .sound])
-            } else {
-                completionHandler([])
-                let userInfo = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
-                self.channel.invokeMethod("onMessage", arguments: userInfo)
+        DispatchQueue.main.async {
+            self.channel.invokeMethod("willPresent", arguments: dict) { (result) in
+                let shouldShow = (result as? Bool) ?? false
+                NSLog("[FlutterApns] willPresent shouldShow: \(shouldShow)")
+                if shouldShow {
+                    completionHandler([.alert, .sound])
+                } else {
+                    completionHandler([])
+                    let userInfo = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
+                    NSLog("[FlutterApns] Calling onMessage from willPresent")
+                    DispatchQueue.main.async {
+                        self.channel.invokeMethod("onMessage", arguments: userInfo)
+                    }
+                }
             }
         }
     }
     
     public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        NSLog("[FlutterApns] userNotificationCenter didReceive response called")
         var userInfo = response.notification.request.content.userInfo
+        NSLog("[FlutterApns] response userInfo: \(userInfo)")
+        NSLog("[FlutterApns] actionIdentifier: \(response.actionIdentifier)")
+        
         guard userInfo["aps"] != nil else {
+            NSLog("[FlutterApns] No 'aps' key found, ignoring notification response")
             return
         }
         
@@ -228,16 +265,21 @@ func getFlutterError(_ error: Error) -> FlutterError {
         let dict = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
         
         if launchNotification != nil {
+            NSLog("[FlutterApns] Updating cached launch notification")
             launchNotification = dict
             return
         }
 
+        NSLog("[FlutterApns] Calling onResume from didReceive")
         onResume(userInfo: dict)
         completionHandler()
     }
     
     func onResume(userInfo: [AnyHashable: Any]) {
-        channel.invokeMethod("onResume", arguments: userInfo)
+        NSLog("[FlutterApns] onResume invoked with userInfo: \(userInfo)")
+        DispatchQueue.main.async {
+            self.channel.invokeMethod("onResume", arguments: userInfo)
+        }
     }
 }
 

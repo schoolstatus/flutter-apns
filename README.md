@@ -15,10 +15,12 @@ Currently, the only available push notification plugin is `firebase_messaging`. 
 1. Configure firebase on Android according to instructions: https://pub.dartlang.org/packages/firebase_messaging.
 2. On iOS, make sure you have correctly configured your app to support push notifications, and that you have generated certificate/token for sending pushes. For more infos see section [How to run example app on iOS](#how-to-run-example-app-on-ios)
 
-3. Add the following lines to the `didFinishLaunchingWithOptions` method in the AppDelegate.m/AppDelegate.swift file of your iOS project
+3. Add the following lines to the `didFinishLaunchingWithOptions` method in the AppDelegate.m/AppDelegate.swift file of your iOS project. **IMPORTANT:** The delegate must be set AFTER calling `GeneratedPluginRegistrant.register(with: self)`.
 
 Objective-C:
 ```objc
+[GeneratedPluginRegistrant registerWithRegistry:self];
+
 if (@available(iOS 10.0, *)) {
   [UNUserNotificationCenter currentNotificationCenter].delegate = (id<UNUserNotificationCenterDelegate>) self;
 }
@@ -26,8 +28,10 @@ if (@available(iOS 10.0, *)) {
 
 Swift:
 ```swift
+GeneratedPluginRegistrant.register(with: self)
+
 if #available(iOS 10.0, *) {
-  UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
+  UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
 }
 ```
 

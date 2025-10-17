@@ -57,6 +57,12 @@ class ApnsPushConnectorOnly {
     ApnsMessageHandler? onResume,
     ApnsMessageHandler? onBackgroundMessage,
   }) {
+    print('[FlutterApns] configureApns called');
+    print('[FlutterApns] onMessage: ${onMessage != null ? "provided" : "null"}');
+    print('[FlutterApns] onLaunch: ${onLaunch != null ? "provided" : "null"}');
+    print('[FlutterApns] onResume: ${onResume != null ? "provided" : "null"}');
+    print('[FlutterApns] onBackgroundMessage: ${onBackgroundMessage != null ? "provided" : "null"}');
+    
     _onMessage = onMessage;
     _onLaunch = onLaunch;
     _onResume = onResume;
@@ -65,8 +71,12 @@ class ApnsPushConnectorOnly {
   }
 
   Future<dynamic> _handleMethod(MethodCall call) async {
+    print('[FlutterApns] Dart received method call: ${call.method}');
+    print('[FlutterApns] Arguments: ${call.arguments}');
+    
     switch (call.method) {
       case 'onToken':
+        print('[FlutterApns] Setting token: ${call.arguments}');
         token.value = call.arguments;
         return null;
       case 'onIosSettingsRegistered':
@@ -74,14 +84,19 @@ class ApnsPushConnectorOnly {
             call.arguments.cast<String, bool>());
 
         isDisabledByUser.value = obj.alert == false;
+        print('[FlutterApns] isDisabledByUser: ${isDisabledByUser.value}');
         return null;
       case 'onMessage':
+        print('[FlutterApns] onMessage handler: ${_onMessage != null ? "exists" : "null"}');
         return _onMessage?.call(_extractMessage(call));
       case 'onLaunch':
+        print('[FlutterApns] onLaunch handler: ${_onLaunch != null ? "exists" : "null"}');
         return _onLaunch?.call(_extractMessage(call));
       case 'onResume':
+        print('[FlutterApns] onResume handler: ${_onResume != null ? "exists" : "null"}');
         return _onResume?.call(_extractMessage(call));
       case 'willPresent':
+        print('[FlutterApns] willPresent handler: ${shouldPresent != null ? "exists" : "null"}');
         return shouldPresent?.call(_extractMessage(call)) ??
             Future.value(false);
 
