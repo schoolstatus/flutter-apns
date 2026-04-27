@@ -227,6 +227,7 @@ func getFlutterError(_ error: Error) -> FlutterError {
         
         guard userInfo["aps"] != nil else {
             NSLog("[FlutterApns] No 'aps' key found, ignoring notification")
+            completionHandler([])
             return
         }
         
@@ -258,6 +259,7 @@ func getFlutterError(_ error: Error) -> FlutterError {
         
         guard userInfo["aps"] != nil else {
             NSLog("[FlutterApns] No 'aps' key found, ignoring notification response")
+            completionHandler()
             return
         }
         
@@ -267,6 +269,7 @@ func getFlutterError(_ error: Error) -> FlutterError {
         if launchNotification != nil {
             NSLog("[FlutterApns] Updating cached launch notification")
             launchNotification = dict
+            completionHandler()
             return
         }
 
