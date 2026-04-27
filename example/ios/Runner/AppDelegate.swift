@@ -8,17 +8,17 @@ import UserNotifications
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        
-        UNUserNotificationCenter.current().delegate = self
-        
         GeneratedPluginRegistrant.register(with: self)
         
+        if #available(iOS 10.0, *) {
+            UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
+        }
         
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
     
     override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print(error)
+        print("PUSH registration failed: \(error)")
     }
 }
 
